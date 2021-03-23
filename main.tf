@@ -1,53 +1,102 @@
- resource "aws_instance" "app" {
-  ami              =  "ami-00f9f4069d04c0c6e"
-  instance_type     = "t2.micro"
-  vpc_security_group_ids =    [var.sg_pub]   
-   subnet_id   = var.subnet_id_pub
-   key_name = "prod"
+resource "aws_security_group" "testing_web" {
+  name        = "Testing_prod"
+  description = "Allow inbound traffic"
+  vpc_id      = var.myvpc_id
+
+  ingress {
+    description = "HTTP"
+    from_port         = 80
+    to_port           = 80
+    protocol          = "tcp"
+    cidr_blocks       = ["0.0.0.0/0"]
+          }
+  ingress {
+    description = "SSH"
+    from_port         = 22
+    to_port           = 22
+    protocol          = "tcp"
+    cidr_blocks       = ["0.0.0.0/0"]
+          }
+  ingress {
+     description = "ICMP"
+     from_port         = -1
+     to_port           = -1
+     protocol          = "icmp"
+     cidr_blocks       = ["0.0.0.0/0"]  
+        }
+  egress {
+    description = "outbound"
+    from_port         = 0
+    to_port           = 0
+    protocol          = "-1"
+    cidr_blocks       = ["0.0.0.0/0"]
+          }
+  
+
   tags = {
-    Name = "myec2"
-  }
-  provisioner "remote-exec" {
-     inline = [
-       "sudo amazon-linux-extras install -y nginx1.12",
-       "sudo systemctl start nginx"
-     ]
-
-   connection {
-     type = "ssh"
-     user = "ec2-user"
-     private_key = file("./ec2/prod.pem")  # var.prv_key
-     host = self.public_ip
-   }
-   }
-}
-variable "sg_pub"{
-    
-}
-variable "subnet_id_pub"{
-
-}
-
-resource "aws_eip" "my_eip" {
-  #   depends_on= [var.route_table_associate] #aws_route_table_association.pub]
-  # instance = var.nat_id
-  vpc      = true
-}
-output  "eip_output" {
-    value = aws_eip.my_eip.id
-}
-
-
-
-resource "aws_nat_gateway" "nat_gateway" {
-  allocation_id = aws_eip.my_eip.id
-  subnet_id     = var.subnet_id_pub
-
-   tags = {
-    Name = "gw_NAT"
+    Name = "mysg_pub"
   }
 }
 
-output "nat_output"{
-  value = aws_nat_gateway.nat_gateway.id
+output "sg_ouput_pub"{
+    value = aws_security_group.testing_web.id
 }
+
+
+
+
+resource "aws_security_group" "testing_db" {
+  name        = "Testing_db"
+  description = "Allow inbound traffic"
+  vpc_id      = var.myvpc_id
+
+  ingress {
+  description = "Redshift"
+     from_port         = 5439
+  to_port           = 5439
+   protocol          = "tcp"
+    cidr_blocks       = [var.subnet_cidr_db]
+          }
+  ingress {
+     description = "ICMP"
+     from_port         = -1
+     to_port           = -1
+     protocol          = "icmp"
+     cidr_blocks       = [var.subnet_cidr_db]  
+        }
+  ingress {
+    description = "SSH"
+    from_port         = 22
+    to_port           = 22
+    protocol          = "tcp"
+    cidr_blocks       = [var.subnet_cidr_db]
+          }
+
+  egress {
+    description = "outbound"
+    from_port         = 0
+    to_port           = 0
+    protocol          = "-1"
+    cidr_blocks       = ["0.0.0.0/0"]
+          }
+
+  tags = {
+    Name = "mysg_db"
+  }
+}
+
+variable "subnet_cidr_db"{
+
+}
+
+variable "myvpc_id"{    
+}
+
+output "sg_ouput_db"{
+    value = aws_security_group.testing_db.id
+}
+
+
+
+# open the port for ssh, icmp (0-65535), mysql, redshift ,(public subnet cidr), for private sg
+# open the port for ssh , http  in public sg
